@@ -27,8 +27,11 @@ namespace LibSC
                         SocketMethods? method = null;
                         if((bool)MySocketExtension.methods?.TryGetValue(msg, out method))
                         {
-                            method?.Invoke(null);
-                            MySocketExtension.sentMsg(this, $"done: {msg}");
+                            if ((bool)method?.Invoke(null)) 
+                            {
+                                string fname = $"{MySocketExtension.fname}{MySocketExtension.i}.txt";
+                                MySocketExtension.sentMsg(this, $"{msg} : {fname}"); 
+                            }
                         }
                         else
                         {

@@ -1,18 +1,20 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace LibSC
 {
-    public delegate void SocketMethods(Socket? socket);
+    public delegate bool SocketMethods(Socket? socket);
 
     public static class MySocketExtension
     {
-        private static string fname;
-        private static int i;
+        public static string fname { get; private set; }
+        public static int i { get; private set; }
         public static Dictionary<string, SocketMethods>? methods { get; private set; }
 
         static MySocketExtension()
@@ -62,21 +64,58 @@ namespace LibSC
             return bytes;
         }
 
-        public static void createFile(Socket? socket = null)
+        public static bool createFile(Socket? socket = null)
         {
-            if (!File.Exists($"{fname}{i}.txt")) { File.Create($"{fname}{i}.txt"); }
-            i +=1;
+            while (true)
+            {
+                if (!File.Exists($"{fname}{i}.txt")) 
+                { 
+                    using var f = File.Create($"{fname}{i}.txt");
+                    break;
+                }
+                i += 1;
+            }
+            return EnvToFile();
         }
 
-        public static void deleteFile(Socket? socket = null)
+        public static bool deleteFile(Socket? socket = null)
         {
-            i -=1;
-            if (!File.Exists($"{fname}{i}.txt")) { File.Delete($"{fname}{i}.txt"); }
+            while (true)
+            {
+                i -= 1;
+                if (!File.Exists($"{fname}{i}.txt")) 
+                {
+                    File.Delete($"{fname}{i}.txt");
+                    break;
+                }
+            }
+
+            return true;
         }
 
-        public static void getEnvironment(Socket? socket = null)
+        public static bool EnvToFile()
         {
-            Console.WriteLine("call method getEnvironment");
+            FileStream? fs = null;
+            bool flag = false;
+
+            try
+            {
+                fs = new FileStream($"{fname}{i}.txt", FileMode.Open);
+                Dictionary<object, object> dict = new Dictionary<object, object>(Environment.GetEnvironmentVariables().Count);
+                foreach (DictionaryEntry de in Environment.GetEnvironmentVariables()) { if (de.Value != null) { dict.TryAdd(de.Key, de.Value); } }
+
+                JsonSerializer.Serialize<Dictionary<object, object>>(fs, dict);
+                flag = true;
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText($"{fname}{i}.txt", ex.Message);
+            }
+            finally { fs?.Close(); }
+
+            return flag;
         }
+
+        public static bool getEnvironment(Socket? socket = null) => false;
     }
 }
