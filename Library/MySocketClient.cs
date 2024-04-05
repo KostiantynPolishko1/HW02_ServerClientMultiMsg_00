@@ -21,11 +21,27 @@ namespace LibSC
                 {
                     MySocketExtension.getMsg(this, out string? msg);
                     Console.Clear();
-                    Console.WriteLine($"server msg: {msg}");
 
-                    if (msg != null && msg.Equals("exit")) { break; }
+                    if ((bool)MySocketExtension.methods?.ContainsKey(msg))
+                    {
+                        SocketMethods? method = null;
+                        if((bool)MySocketExtension.methods?.TryGetValue(msg, out method))
+                        {
+                            method?.Invoke(null);
+                            MySocketExtension.sentMsg(this, $"done: {msg}");
+                        }
+                        else
+                        {
+                            MySocketExtension.sentMsg(this, $"fault: {msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"server msg: {msg}");
+                        if (msg != null && msg.Equals("exit")) { break; }
 
-                    MySocketExtension.sentMsg(this, out msg);
+                        MySocketExtension.sentMsg(this, out msg);
+                    }
                 }
             }
             catch (SocketException se)
