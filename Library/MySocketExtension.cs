@@ -26,7 +26,7 @@ namespace LibSC
             {
                 { "createFile", createFile},
                 { "deleteFile", deleteFile},
-                { "getEnvironment", getEnvironment}
+                { "getEnv", getEnvironment}
             };
         }
 
@@ -55,11 +55,33 @@ namespace LibSC
             msg = Encoding.Unicode.GetString(data, 0, bytesRead);
         }
 
+        public static bool getEnvMsg(in Socket socket)
+        {
+            byte[] bytes = new byte[32];
+            socket.Receive(bytes);
+
+            int size = BitConverter.ToInt32(bytes, 0);
+            byte[] data = new byte[size];
+            socket.Receive(data);
+
+            if (EnvToFile(data)) { return true; }
+            return false;
+        }
+
         private static byte[] IntToBytes(string? msg)
         {
             byte[] bytes = BitConverter.GetBytes(Encoding.Unicode.GetByteCount(msg ??= "no msg"));
 
             if (BitConverter.IsLittleEndian) { Array.Reverse(bytes); }
+
+            return bytes;
+        }
+
+        private static byte[] IntToBytes(int size)
+        {           
+            byte[] bytes = BitConverter.GetBytes(size);
+
+            //if (BitConverter.IsLittleEndian) { Array.Reverse(bytes); }
 
             return bytes;
         }
@@ -93,18 +115,28 @@ namespace LibSC
             return true;
         }
 
-        public static bool EnvToFile()
+        public static bool EnvToFile(in byte[]? data = null)
         {
             FileStream? fs = null;
             bool flag = false;
+            Dictionary<string, string> dict = null;
 
             try
             {
-                fs = new FileStream($"{fname}{i}.txt", FileMode.Open);
-                Dictionary<object, object> dict = new Dictionary<object, object>(Environment.GetEnvironmentVariables().Count);
-                foreach (DictionaryEntry de in Environment.GetEnvironmentVariables()) { if (de.Value != null) { dict.TryAdd(de.Key, de.Value); } }
+                fs = new FileStream($"{fname}{i}.txt", FileMode.OpenOrCreate);
 
-                JsonSerializer.Serialize<Dictionary<object, object>>(fs, dict);
+                if(data == null)
+                {
+                    dict = new Dictionary<string, string>(Environment.GetEnvironmentVariables().Count);
+                    foreach (DictionaryEntry de in Environment.GetEnvironmentVariables()) { if (de.Value != null) { dict.TryAdd(de.Key.ToString(), de.Value.ToString()); } }
+                }
+                else
+                {
+                    Utf8JsonReader utf8Reader = new Utf8JsonReader(data);
+                    dict = JsonSerializer.Deserialize<Dictionary<string, string>>(ref utf8Reader)!;
+                }
+
+                JsonSerializer.Serialize<Dictionary<string, string>>(fs, dict);
                 flag = true;
             }
             catch (Exception ex)
@@ -116,6 +148,30 @@ namespace LibSC
             return flag;
         }
 
-        public static bool getEnvironment(Socket? socket = null) => false;
+        public static bool getEnvironment(Socket? socket = null)
+        {
+            FileStream fs = null;
+            bool flag = false;
+
+            try 
+            {
+                fs = new FileStream($"{fname}{i}.txt", FileMode.Open);
+
+                Dictionary<string, string>? dict = JsonSerializer.Deserialize<Dictionary<string, string>?> (fs);
+                byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(dict);
+
+                socket?.Send(IntToBytes(Buffer.ByteLength(bytes)));
+                socket?.Send(bytes);
+
+                flag = true;
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText($"{fname}{i}.txt", ex.Message);
+            }
+            finally { fs?.Close(); }
+
+            return flag;
+        }
     }
 }

@@ -27,9 +27,18 @@ namespace LibSC
                         socket.Shutdown(SocketShutdown.Both);
                         break;
                     }
-
-                    MySocketExtension.getMsg(socket, out msg);
-                    Console.WriteLine($"client msg: {msg}");
+                    else if (msg != null && msg.Equals("getEnv"))
+                    {
+                        if (MySocketExtension.getEnvMsg(socket))
+                        {
+                            Console.WriteLine("receive obj Dictionary");
+                        }
+                    }
+                    else
+                    {
+                        MySocketExtension.getMsg(socket, out msg);
+                        Console.WriteLine($"client msg: {msg}");
+                    }
                 }
             }
             catch (SocketException se)
